@@ -1,52 +1,163 @@
 NEJ.define([
   'base/element',
   'base/event',
-  'util/template/jst'
-], function(_e, _v, _t, _p) {
-  var _cach_list = [
-    { value: 1 },
-    { value: 2 },
-    { value: 3 },
-    { value: 4 }
-  ];
-  var _html_seed = _t._$add('jst-template');
+  'util/ajax/xdr'
+], function(_e, _v, _j, _p) {
+  var _cach_list = [];
+  var _cach_active_list = [];
+  var _cach_completed_list = [];
+  var _pro = _p;
+
+  var _parent = _e._$get('todo-box');
+  var _input_info = _e._$getByClassName(_parent, 'new-todo')[0];
+  var _selectors = _e._$getByClassName(_parent, 'filters')[0];
 
   /*****Begin function define*****/
-  function updateTpl(cach_data) {
-    _t._$render(
-      'template-box',
-      _html_seed,
-      { items: cach_data }
-    );
+  function eventHandle(idx, funcs) {
+    return function (_event) {
+      funcs.forEach(function (func) {
+        func(_event, idx);
+      });
+    }
+  }
+  
+  function capitalCase(str) {
+    return str[0].toUpperCase() + str.slice(1);
   }
 
-  function eventHandle(idx, func) {
-    return function(_event) {
-      func(_event, idx);
+  _p._refreshItems = function(_list) {
+    _list.forEach(function(item) {
+      _pro._addItem(item);
+    });
+  }
+
+  _p._remoteGetAllItems = function() {
+    var _requestId = _j._$request('/api/all', {
+      sync: false,
+      method: 'get',
+      type: 'json',
+      timeout: 2000,
+      mode: 0 || 1 || 2 || 3,
+      onload: function(_data) {
+        _cach_list = Array.prototype.concat(_cach_list, JSON.parse(_data));
+        _pro._refreshItems(_cach_list);
+      }
+    });
+  }
+
+  _p._remoteGetActiveItems = function () {
+    var _requestId = _j._$request('/api/active', {
+      sync: false,
+      method: 'get',
+      type: 'json',
+      timeout: 2000,
+      mode: 0 || 1 || 2 || 3,
+      onload: function (_data) {
+        _cach_active_list = Array.prototype.concat(_cach_active_list, JSON.parse(_data));
+        _pro._refreshItems(_cach_active_list);
+      }
+    });
+  }
+
+  _p._remoteGetCompletedItems = function () {
+    var _requestId = _j._$request('/api/completed', {
+      sync: false,
+      method: 'get',
+      type: 'json',
+      timeout: 2000,
+      mode: 0 || 1 || 2 || 3,
+      onload: function (_data) {
+        _cach_completed_list = Array.prototype.concat(_cach_completed_list, JSON.parse(_data));
+        _pro._refreshItems(_cach_completed_list);
+      }
+    });
+  }
+
+  _p._addItem = function(input_info) {
+    _e._$create('li', 'todo-items', 'todo-list');
+    var todo_list = _e._$get('todo-list');
+    var new_item = _e._$getChildren(todo_list)[_cach_list.length-1];
+    _e._$create('div', 'view', new_item);
+    var new_view = _e._$getByClassName(new_item, 'view')[0];
+    _e._$create('input', 'toggle', new_view);
+    var new_check = _e._$getByClassName(new_view, 'toggle')[0];
+    new_check.type = 'checkbox';
+    _e._$create('label', '', new_view);
+    var new_label = _e._$getChildren(new_view)[1];
+    new_label.innerText = input_info.value;
+    _e._$create('button', 'destroy', new_view);
+  }
+
+  _p._switchSelector = function(_select_type) {
+    var _old_selected = _e._$getByClassName(_selectors, 'selected')[0];
+    _e._$delClassName(_old_selected, 'selected');
+    var _selector_items = _e._$getChildren(_selectors);
+    for (var i = 0, l = _selector_items.length; i < l; i++) {
+      var _new_selected = _e._$getChildren(_selector_items[i])[0];
+      if (_new_selected.innerText === capitalCase(_select_type)) {
+        _e._$addClassName(_new_selected, 'selected');
+      }
+    }
+    switch (_select_type) {
+      case 'all':
+        _pro._remoteGetAllItems();
+        break;
+      case 'active':
+        _pro._remoteGetActiveItems();
+        break;
+      case 'completed':
+        _pro._remoteGetCompletedItems();
+        break;
+      default:
+        break;
+    }
+  }
+
+  function completeItem(_event) {
+    var class_name = _event.target.className;
+    if ( class_name === 'toggle') {
+      var _parent_li = event.target.parentNode.parentNode;
+      _parent_li.className.indexOf('completed') !== -1
+        ? _e._$delClassName(_parent_li, 'completed')
+        : _e._$addClassName(_parent_li, 'completed');
     }
   }
 
   function deleteItem(_event, idx) {
     if (_event.target.className === 'destroy' && idx < _cach_list.length) {
       _cach_list.splice(idx, 1);
-      updateTpl(_cach_list);
-      init();
     }
   }
 
-  function init() {
-    var _item_parent = _e._$get('todo-list');
-    var _item_list = _e._$getByClassName(_item_parent, 'todo-items');
+  _p._init = function() {
+    var _select = window.location.hash.replace('#\/', '');
+    _p._switchSelector(_select);
 
-    for (var i = _item_list.length - 1; i >= 0; i--) {
-      _v._$addEvent(
-        _item_list[i],
-        'click',
-        eventHandle(i, deleteItem)
-      );
-    }
+    _v._$addEvent(_input_info, 'keydown', function(_event) {
+      if (_event.keyCode === 13) {
+        _cach_list.push({value: _input_info.value});
+        _pro._addItem(_input_info);
+      }
+    });
+
+    _v._$addEvent(_selectors, 'click', function(_event) {
+      var _new_selected = _v._$getElement(_event);
+      var _select_type = _new_selected.innerText.toLowerCase();
+      _pro._switchSelector(_select_type);
+    });
+
+    // for (var i = _item_list.length - 1; i >= 0; i--) {
+    //   _v._$addEvent(
+    //     _item_list[i],
+    //     'click',
+    //     eventHandle(i, [completeItem, deleteItem])
+    //   );
+    // }
+
+    
   }
   /*****End function define*****/
-  updateTpl(_cach_list);  
-  init();
+  _p._init();
+
+  return _p;
 });
