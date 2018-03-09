@@ -25,6 +25,10 @@ NEJ.define([
     return str[0].toUpperCase() + str.slice(1);
   }
 
+  function localHash() {
+    return window.location.hash.replace('#\/', '')
+  }
+
   _p._refreshItems = function(_list) {
     var _todo_list = _e._$get('todo-list');
     _e._$getChildren(_todo_list).forEach(function(node) {
@@ -32,6 +36,51 @@ NEJ.define([
     });
     _list.forEach(function(item) {
       _pro._addItem(item, _list);
+    });
+  }
+
+  _p._remoteAddItem = function(new_item) {
+    var _requestId = _j._$request('/api/all', {
+      sync: false,
+      method: 'post',
+      type: 'json',
+      data: JSON.stringify(new_item),
+      timeout: 2000,
+      mode: 0 || 1 || 2 || 3,
+      onload: function (_data) {
+        console.log('success add');
+      },
+      onerror: function (_error) {
+        alert('添加错误，请重新再试');
+      }
+    });
+  }
+
+  _p._remoteDeleteItem = function(id) {
+    var _requestId = _j._$request('/api/all', {
+      sync: false,
+      method: 'del',
+      type: 'json',
+      data: id,
+      timeout: 2000,
+      mode: 0 || 1 || 2 || 3,
+      onload: function (_data) {
+        console.log('success delete');
+        var _cach_type = localHash();
+        if (_cach_type === 'active') {
+          _cach_active_list = JSON.parse(_data);
+          _pro._refreshItems(_cach_active_list);
+        } else if (_cach_type === 'completed') {
+          _cach_completed_list = JSON.parse(_data);
+          _pro._refreshItems(_cach_completed_list);
+        } else {
+          _cach_list = JSON.parse(_data);
+          _pro._refreshItems(_cach_list);
+        }
+      },
+      onerror: function (_error) {
+        console.log('请求错误，请重新再试');
+      }
     });
   }
 
@@ -105,6 +154,12 @@ NEJ.define([
     var new_label = _e._$getChildren(new_view)[1];
     new_label.innerText = item.value;
     _e._$create('button', 'destroy', new_view);
+    var new_destroy = _e._$getByClassName(new_view, 'destroy')[0];
+    _v._$addEvent(
+      new_view,
+      'click',
+      eventHandle(_list.length - 1, [completeItem, deleteItem])
+    );
   }
 
   _p._switchSelector = function(_select_type) {
@@ -137,7 +192,7 @@ NEJ.define([
 
   function completeItem(_event) {
     var class_name = _event.target.className;
-    if ( class_name === 'toggle') {
+    if (class_name === 'toggle') {
       var _parent_li = event.target.parentNode.parentNode;
       _parent_li.className.indexOf('completed') !== -1
         ? _e._$delClassName(_parent_li, 'completed')
@@ -147,17 +202,18 @@ NEJ.define([
 
   function deleteItem(_event, idx) {
     if (_event.target.className === 'destroy' && idx < _cach_list.length) {
-      _cach_list.splice(idx, 1);
+      _pro._remoteDeleteItem(idx);
     }
   }
 
   _p._init = function() {
-    var _select = window.location.hash.replace('#\/', '');
+    var _select = localHash();
     _p._switchSelector(_select);
 
     _v._$addEvent(_input_info, 'keydown', function(_event) {
       if (_event.keyCode === 13) {
-        _cach_list.push({value: _input_info.value});
+        _cach_list.push({ value: _input_info.value });
+        _pro._remoteAddItem({ value: _input_info.value });
         _pro._addItem(_input_info, _cach_list);
         _input_info.value = '';
       }
@@ -168,15 +224,6 @@ NEJ.define([
       var _select_type = _new_selected.innerText.toLowerCase();
       _pro._switchSelector(_select_type);
     });
-
-    // for (var i = _item_list.length - 1; i >= 0; i--) {
-    //   _v._$addEvent(
-    //     _item_list[i],
-    //     'click',
-    //     eventHandle(i, [completeItem, deleteItem])
-    //   );
-    // }
-
     
   }
   /*****End function define*****/
