@@ -26,8 +26,12 @@ NEJ.define([
   }
 
   _p._refreshItems = function(_list) {
+    var _todo_list = _e._$get('todo-list');
+    _e._$getChildren(_todo_list).forEach(function(node) {
+      _e._$remove(node, false);
+    });
     _list.forEach(function(item) {
-      _pro._addItem(item);
+      _pro._addItem(item, _list);
     });
   }
 
@@ -39,8 +43,13 @@ NEJ.define([
       timeout: 2000,
       mode: 0 || 1 || 2 || 3,
       onload: function(_data) {
-        _cach_list = Array.prototype.concat(_cach_list, JSON.parse(_data));
+        _cach_list = JSON.parse(_data);
         _pro._refreshItems(_cach_list);
+      },
+      onerror: function(_error) {
+        alert('请求错误，请重新再试');
+        _cach_list = [];
+        _pro._refreshItems([]);
       }
     });
   }
@@ -53,8 +62,13 @@ NEJ.define([
       timeout: 2000,
       mode: 0 || 1 || 2 || 3,
       onload: function (_data) {
-        _cach_active_list = Array.prototype.concat(_cach_active_list, JSON.parse(_data));
+        _cach_active_list = JSON.parse(_data);
         _pro._refreshItems(_cach_active_list);
+      },
+      onerror: function (_error) {
+        alert('请求错误，请重新再试');
+        _cach_active_list = [];
+        _pro._refreshItems([]);
       }
     });
   }
@@ -67,16 +81,21 @@ NEJ.define([
       timeout: 2000,
       mode: 0 || 1 || 2 || 3,
       onload: function (_data) {
-        _cach_completed_list = Array.prototype.concat(_cach_completed_list, JSON.parse(_data));
+        _cach_completed_list = JSON.parse(_data);
         _pro._refreshItems(_cach_completed_list);
+      },
+      onerror: function (_error) {
+        alert('请求错误，请重新再试');
+        _cach_completed_list = [];
+        _pro._refreshItems([]);
       }
     });
   }
 
-  _p._addItem = function(input_info) {
+  _p._addItem = function(item, _list) {
     _e._$create('li', 'todo-items', 'todo-list');
     var todo_list = _e._$get('todo-list');
-    var new_item = _e._$getChildren(todo_list)[_cach_list.length-1];
+    var new_item = _e._$getChildren(todo_list)[_list.length-1];
     _e._$create('div', 'view', new_item);
     var new_view = _e._$getByClassName(new_item, 'view')[0];
     _e._$create('input', 'toggle', new_view);
@@ -84,20 +103,11 @@ NEJ.define([
     new_check.type = 'checkbox';
     _e._$create('label', '', new_view);
     var new_label = _e._$getChildren(new_view)[1];
-    new_label.innerText = input_info.value;
+    new_label.innerText = item.value;
     _e._$create('button', 'destroy', new_view);
   }
 
   _p._switchSelector = function(_select_type) {
-    var _old_selected = _e._$getByClassName(_selectors, 'selected')[0];
-    _e._$delClassName(_old_selected, 'selected');
-    var _selector_items = _e._$getChildren(_selectors);
-    for (var i = 0, l = _selector_items.length; i < l; i++) {
-      var _new_selected = _e._$getChildren(_selector_items[i])[0];
-      if (_new_selected.innerText === capitalCase(_select_type)) {
-        _e._$addClassName(_new_selected, 'selected');
-      }
-    }
     switch (_select_type) {
       case 'all':
         _pro._remoteGetAllItems();
@@ -109,7 +119,19 @@ NEJ.define([
         _pro._remoteGetCompletedItems();
         break;
       default:
-        break;
+        _pro._remoteGetAllItems();
+    }
+
+    if (_select_type !== '') {
+      var _old_selected = _e._$getByClassName(_selectors, 'selected')[0];
+      _e._$delClassName(_old_selected, 'selected');
+      var _selector_items = _e._$getChildren(_selectors);
+      for (var i = 0, l = _selector_items.length; i < l; i++) {
+        var _new_selected = _e._$getChildren(_selector_items[i])[0];
+        if (_new_selected.innerText === capitalCase(_select_type)) {
+          _e._$addClassName(_new_selected, 'selected');
+        }
+      }
     }
   }
 
@@ -136,7 +158,8 @@ NEJ.define([
     _v._$addEvent(_input_info, 'keydown', function(_event) {
       if (_event.keyCode === 13) {
         _cach_list.push({value: _input_info.value});
-        _pro._addItem(_input_info);
+        _pro._addItem(_input_info, _cach_list);
+        _input_info.value = '';
       }
     });
 
