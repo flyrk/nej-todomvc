@@ -13,10 +13,10 @@ NEJ.define([
   var _selectors = _e._$getByClassName(_parent, 'filters')[0];
 
   /*****Begin function define*****/
-  function eventHandle(idx, funcs) {
+  function eventHandle(options, funcs) {
     return function (_event) {
       funcs.forEach(function (func) {
-        func(_event, idx);
+        func(_event, options);
       });
     }
   }
@@ -26,17 +26,20 @@ NEJ.define([
   }
 
   function localHash() {
-    return window.location.hash.replace('#\/', '')
+    return window.location.hash.replace('#\/', '');
   }
 
   _p._refreshItems = function(_list) {
     var _todo_list = _e._$get('todo-list');
+    // 因为每次都是直接从后端拿数据，所以需要把之前的list item清除
     _e._$getChildren(_todo_list).forEach(function(node) {
       _e._$remove(node, false);
     });
     _list.forEach(function(item) {
       _pro._addItem(item, _list);
     });
+    var _todo_count = _e._$getByClassName(_parent, 'todo-count')[0];
+    _todo_count.innerText = _cach_active_list.length + ' items left';
   }
 
   _p._remoteAddItem = function(new_item) {
@@ -56,17 +59,36 @@ NEJ.define([
     });
   }
 
-  _p._remoteDeleteItem = function(id) {
+  _p._remoteAddCompleteItem = function(options) {
+    var _requestId = _j._$request('/api/completed', {
+      sync: false,
+      method: 'post',
+      type: 'json',
+      data: options.id,
+      timeout: 2000,
+      mode: 0 || 1 || 2 || 3,
+      onload: function (_data) {
+        console.log('success add');
+      },
+      onerror: function (_error) {
+        alert('添加错误，请重新再试');
+      }
+    });
+  }
+
+  _p._remoteDeleteItem = function (id, _cach_type) {
     var _requestId = _j._$request('/api/all', {
       sync: false,
       method: 'del',
       type: 'json',
-      data: id,
+      data: {
+        id: id,
+        itemType: _cach_type
+      },
       timeout: 2000,
       mode: 0 || 1 || 2 || 3,
       onload: function (_data) {
         console.log('success delete');
-        var _cach_type = localHash();
         if (_cach_type === 'active') {
           _cach_active_list = JSON.parse(_data);
           _pro._refreshItems(_cach_active_list);
@@ -92,7 +114,7 @@ NEJ.define([
       timeout: 2000,
       mode: 0 || 1 || 2 || 3,
       onload: function(_data) {
-        _cach_list = JSON.parse(_data);
+        _cach_list = _data || [];
         _pro._refreshItems(_cach_list);
       },
       onerror: function(_error) {
@@ -111,7 +133,7 @@ NEJ.define([
       timeout: 2000,
       mode: 0 || 1 || 2 || 3,
       onload: function (_data) {
-        _cach_active_list = JSON.parse(_data);
+        _cach_active_list = _data || [];
         _pro._refreshItems(_cach_active_list);
       },
       onerror: function (_error) {
@@ -130,7 +152,7 @@ NEJ.define([
       timeout: 2000,
       mode: 0 || 1 || 2 || 3,
       onload: function (_data) {
-        _cach_completed_list = JSON.parse(_data);
+        _cach_completed_list = _data || [];
         _pro._refreshItems(_cach_completed_list);
       },
       onerror: function (_error) {
@@ -152,13 +174,19 @@ NEJ.define([
     new_check.type = 'checkbox';
     _e._$create('label', '', new_view);
     var new_label = _e._$getChildren(new_view)[1];
-    new_label.innerText = item.value;
+    new_label.innerText = item.itemName;
     _e._$create('button', 'destroy', new_view);
     var new_destroy = _e._$getByClassName(new_view, 'destroy')[0];
     _v._$addEvent(
       new_view,
       'click',
-      eventHandle(_list.length - 1, [completeItem, deleteItem])
+      eventHandle(
+        {
+          id: _list.length - 1,
+          itemName: item.itemName
+        },
+        [completeItem, deleteItem]
+      )
     );
   }
 
@@ -190,19 +218,21 @@ NEJ.define([
     }
   }
 
-  function completeItem(_event) {
+  function completeItem(_event, options) {
     var class_name = _event.target.className;
     if (class_name === 'toggle') {
-      var _parent_li = event.target.parentNode.parentNode;
+      var _parent_view = event.target.parentNode;
+      var _parent_li = _parent_view.parentNode;
       _parent_li.className.indexOf('completed') !== -1
         ? _e._$delClassName(_parent_li, 'completed')
         : _e._$addClassName(_parent_li, 'completed');
+      _pro._remoteAddCompleteItem(options);
     }
   }
 
-  function deleteItem(_event, idx) {
-    if (_event.target.className === 'destroy' && idx < _cach_list.length) {
-      _pro._remoteDeleteItem(idx);
+  function deleteItem(_event, options) {
+    if (_event.target.className === 'destroy' && options.id < _cach_list.length) {
+      _pro._remoteDeleteItem(options.id, localHash());
     }
   }
 
@@ -211,10 +241,14 @@ NEJ.define([
     _p._switchSelector(_select);
 
     _v._$addEvent(_input_info, 'keydown', function(_event) {
-      if (_event.keyCode === 13) {
-        _cach_list.push({ value: _input_info.value });
-        _pro._remoteAddItem({ value: _input_info.value });
-        _pro._addItem(_input_info, _cach_list);
+      if (_event.keyCode === 13 && _input_info.value !== '') {
+        _cach_list.push({ itemName: _input_info.value });
+        _pro._remoteAddItem({
+          id: _cach_list.length - 1,
+          itemName: _input_info.value,
+          itemType: ['all', 'active']
+        });
+        _pro._addItem({ itemName: _input_info.value }, _cach_list);
         _input_info.value = '';
       }
     });

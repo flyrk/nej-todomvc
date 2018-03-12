@@ -1,18 +1,34 @@
-var express = require('express');
-var router = express.Router();
+import express from 'express';
+import Todo from '../models/todo';
+
+let router = express.Router();
 
 /* GET users listing. */
 router.get('/', function (req, res, next) {
-  res.json('[{"id": 3, "value": 3}]');
+  Todo.find({ itemType: ["all", "completed"] }).exec((err, todo_list) => {
+    if (err) {
+      res.status(500).json({ error: err });
+    } else {
+      res.status(200).json(todo_list);
+    }
+  });
 });
 
 router.post('/', function (req, res, next) {
-  res.status(200);
-  res.send('success');
+  Todo.findOneAndUpdate(
+    { itemType: ["all", "active"] },
+    { $set: {itemType: ["all", "completed"]} }
+  ).exec((err, todo_list) => {
+    if (err) {
+      res.status(500).json({ error: err });
+    } else {
+      res.status(200).json({ success: 'success'});
+    }
+  });
 });
 
 router.delete('/', function (req, res, next) {
   console.log(req.body);
 });
 
-module.exports = router;
+export default router;

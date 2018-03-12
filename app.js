@@ -1,15 +1,23 @@
-var express = require('express');
-var path = require('path');
-var favicon = require('serve-favicon');
-var logger = require('morgan');
-var cookieParser = require('cookie-parser');
-var bodyParser = require('body-parser');
+import express from'express';
+import path from'path';
+import pkg from './package';
+import favicon from'serve-favicon';
+import logger from'morgan';
+import cookieParser from'cookie-parser';
+import bodyParser from'body-parser';
+import mongoose from'mongoose';
 
-var all = require('./routes/all');
-var active = require('./routes/active');
-var completed = require('./routes/completed');
+import all from'./routes/all';
+import active from'./routes/active';
+import completed from'./routes/completed';
 
-var app = express();
+const app = express();
+const dbUrl = 'mongodb://localhost:27017/nej-todo';
+
+mongoose.connect(dbUrl);
+mongoose.connection.on('error', function () {
+  console.info('Error: Could not connect to MongoDB, Did you forget to run `Mongod`?');
+});
 
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
@@ -38,7 +46,9 @@ app.use(function(err, req, res, next) {
 
   // render the error page
   res.status(err.status || 500);
-  res.render('error');
+  res.json({ 'error': 'error' });
 });
 
-module.exports = app;
+app.listen(8080, () => {
+  console.log(`${pkg.name} listening on port 8080`);
+});
