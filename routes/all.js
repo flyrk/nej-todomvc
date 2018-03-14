@@ -15,12 +15,8 @@ router.get('/', function(req, res, next) {
 
 router.post('/', function(req, res, next) {
   const data = Object.keys(req.body);
-  const {id, itemName, itemType} = JSON.parse(data[0]);
-  console.log(id);
-  console.log(itemType);
-  console.log(itemName);
+  const {itemName, itemType} = JSON.parse(data[0]);
   const todo_list = new Todo({
-    id: id,
     itemName: itemName,
     itemType: itemType
   });
@@ -34,7 +30,18 @@ router.post('/', function(req, res, next) {
 });
 
 router.delete('/', function(req, res, next) {
-  console.log(req.body);
+  const data = Object.keys(req.body);
+  const { itemName, itemType } = JSON.parse(data[0]);
+  Todo.findOneAndRemove({
+    itemName: itemName,
+    itemType: itemType
+  }).exec((err, todo_list) => {
+    if (err) {
+      res.status(500).json({ error: err });
+    } else {
+      res.status(200).json({ success: true });
+    }
+  });
 });
 
 export default router;

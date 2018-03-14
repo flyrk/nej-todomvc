@@ -15,9 +15,11 @@ router.get('/', function (req, res, next) {
 });
 
 router.post('/', function (req, res, next) {
+  const data = Object.keys(req.body);
+  const { itemName, itemType } = JSON.parse(data[0]);
   Todo.findOneAndUpdate(
-    { itemType: ["all", "active"] },
-    { $set: {itemType: ["all", "completed"]} }
+    { itemName: itemName },
+    { $set: {itemType: itemType} }
   ).exec((err, todo_list) => {
     if (err) {
       res.status(500).json({ error: err });
@@ -28,7 +30,30 @@ router.post('/', function (req, res, next) {
 });
 
 router.delete('/', function (req, res, next) {
-  console.log(req.body);
+  const data = Object.keys(req.body);
+  const { itemName, itemType } = JSON.parse(data[0]);
+  Todo.findOneAndRemove({
+    itemName: itemName,
+    itemType: itemType
+  }).exec((err, todo_list) => {
+    if (err) {
+      res.status(500).json({ error: err });
+    } else {
+      res.status(200).json({ success: true });
+    }
+  });
+});
+
+router.delete('/clear', function (req, res, next) {
+  Todo.remove({
+    itemType: ['all', 'completed']
+  }).exec((err, todo_list) => {
+    if (err) {
+      res.status(500).json({ error: err });
+    } else {
+      res.status(200).json({ success: true });
+    }
+  });
 });
 
 export default router;
