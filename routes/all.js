@@ -29,6 +29,21 @@ router.post('/', function(req, res, next) {
   })
 });
 
+router.post('/edit', function (req, res, next) {
+  const data = Object.keys(req.body);
+  const { oldItemName, newItemName } = JSON.parse(data[0]);
+  Todo.findOneAndUpdate(
+    { itemName: oldItemName },
+    { $set: { itemName: newItemName } }
+  ).exec((err, todo_list) => {
+    if (err) {
+      res.status(500).json({ error: err });
+    } else {
+      res.status(200).json({ success: 'success' });
+    }
+  });
+});
+
 router.delete('/', function(req, res, next) {
   const data = Object.keys(req.body);
   const { itemName, itemType } = JSON.parse(data[0]);

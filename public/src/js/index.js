@@ -13,6 +13,7 @@ NEJ.define([
   var _parent = _e._$get('todo-box');
   var _input_info = _e._$getByClassName(_parent, 'new-todo')[0];
   var _toggle_all = _e._$getByClassName(_parent, 'toggle-all')[0];
+  var _todo_list = _e._$get('todo-list');
   var _selectors = _e._$getByClassName(_parent, 'filters')[0];
   var _clear_btn = _e._$getByClassName(_parent, 'clear-completed')[0];
 
@@ -34,7 +35,6 @@ NEJ.define([
   }
 
   _p._refreshItems = function(_list) {
-    var _todo_list = _e._$get('todo-list');
     // 因为每次都是直接从后端拿数据，所以需要把之前的list item清除
     _e._$getChildren(_todo_list).forEach(function(node) {
       _e._$remove(node, false);
@@ -194,6 +194,34 @@ NEJ.define([
     });
   }
 
+  _p._remoteEditItem = function(_parent_li, params) {
+    var _requestId = _j._$request('/api/all/edit', {
+      sync: false,
+      method: 'post',
+      type: 'json',
+      data: JSON.stringify(params),
+      timeout: 2000,
+      mode: 0 || 1 || 2 || 3,
+      onload: function (_data) {
+        console.log('success edit');
+        _pro._quitEditingItem(_parent_li, params.newItemName);
+      },
+      onerror: function (_error) {
+        alert('添加错误，请重新再试');
+      }
+    });
+  }
+
+  _p._quitEditingItem = function(_parent_li, itemName) {
+    _e._$delClassName(_parent_li, 'editing');
+    var _child = _e._$getChildren(_parent_li);
+    var _cur_view = _child[0];
+    var _edit_box = _child[1];
+    var _cur_label = _e._$getChildren(_cur_view)[1];
+    _cur_label.innerText = itemName;
+    _e._$remove(_edit_box, false);
+  }
+
   _p._addItem = function(item, index) {
     _e._$create('li', 'todo-items', 'todo-list');
     var todo_list = _e._$get('todo-list');
@@ -253,6 +281,90 @@ NEJ.define([
     }
   }
 
+  _p._initEditItem = function () {
+    _v._$addEvent(_todo_list, 'dblclick', function (_event) {
+      var _itemName = _event.target.innerText;
+      var outer_view = _event.target.parentNode;
+      var outer_li = outer_view.parentNode;
+      _e._$addClassName(outer_li, 'editing');
+      _e._$create('input', 'edit', outer_li);
+      var _edit_box = _e._$getChildren(outer_li)[1];
+      _edit_box.value = _itemName;
+      _edit_box.autofocus = true;
+      _v._$addEvent(_edit_box, 'blur', function () {
+        if (_edit_box.value !== _itemName) {
+          _pro._remoteEditItem(outer_li, {
+            oldItemName: _itemName,
+            newItemName: _edit_box.value
+          });
+        } else {
+          _pro._quitEditingItem(outer_li);
+        }
+        
+      });
+      _v._$addEvent(_edit_box, 'keydown', function (_event) {
+        if (_event.keyCode === 13) {
+          if (_edit_box.value !== _itemName) {
+            _pro._remoteEditItem(outer_li, {
+              oldItemName: _itemName,
+              newItemName: _edit_box.value
+            });
+          } else {
+            _pro._quitEditingItem(outer_li);
+          }
+        }
+      });
+    });
+  }
+
+  _p._initAddItem = function () {
+    _v._$addEvent(_input_info, 'keydown', function (_event) {
+      if (_event.keyCode === 13 && _input_info.value !== '') {
+        _cach_list.push({ itemName: _input_info.value });
+        _pro._remoteAddItem({
+          id: _cach_list.length - 1,
+          itemName: _input_info.value,
+          itemType: ['all', 'active']
+        });
+      }
+    });
+  }
+
+  _p._initToggleAll = function() {
+    _v._$addEvent(_toggle_all, 'click', function () {
+      var params = {};
+      var hasList = null;
+      _e._$getChildren(_todo_list).forEach(function (node) {
+        if (node) {
+          hasList = true;
+          var cur_view = _e._$getByClassName(node, 'view')[0];
+          var cur_label = _e._$getChildren(cur_view)[1];
+          params.itemName = cur_label.innerText;
+          if (_isClear) {
+            if (~node.className.indexOf('completed')) {
+              _e._$delClassName(node, 'completed');
+              params.itemType = ['all', 'active'];
+              _left_item_count++;
+              _pro._remoteChangeCompleteItem(params);
+            }
+          } else {
+            if (!~node.className.indexOf('completed')) {
+              _e._$addClassName(node, 'completed');
+              params.itemType = ['all', 'completed'];
+              _left_item_count--;
+              _pro._remoteChangeCompleteItem(params);
+            }
+          }
+        } else {
+          hasList = false;
+        }
+      });
+      if (hasList) {
+        _isClear = !_isClear;
+      }
+    });
+  }
+
   function completeItem(_event, params) {
     var class_name = _event.target.className;
     if (class_name === 'toggle') {
@@ -272,10 +384,6 @@ NEJ.define([
     }
   }
 
-  function completeAllItem(_event) {
-
-  }
-
   function deleteItem(_event, params) {
     if (_event.target.className === 'destroy' && params.id < _cach_list.length) {
       _pro._remoteDeleteItem(_event, params);
@@ -285,43 +393,9 @@ NEJ.define([
   _p._init = function() {
     var _select = localHash();
     _p._switchSelector(_select);
-
-    _v._$addEvent(_input_info, 'keydown', function(_event) {
-      if (_event.keyCode === 13 && _input_info.value !== '') {
-        _cach_list.push({ itemName: _input_info.value });
-        _pro._remoteAddItem({
-          id: _cach_list.length - 1,
-          itemName: _input_info.value,
-          itemType: ['all', 'active']
-        });
-      }
-    });
-
-    _v._$addEvent(_toggle_all, 'click', function() {
-      var _todo_list = _e._$get('todo-list');
-      var params = {};
-      _e._$getChildren(_todo_list).forEach(function (node) {
-        var cur_view = _e._$getByClassName(node, 'view')[0];
-        var cur_label = _e._$getChildren(cur_view)[1];
-        params.itemName = cur_label.innerText;
-        if (_isClear) {
-          if (~node.className.indexOf('completed')) {
-            _e._$delClassName(node, 'completed');
-            params.itemType = ['all', 'active'];
-            _left_item_count++;
-            _pro._remoteChangeCompleteItem(params);
-          }
-        } else {
-          if (!~node.className.indexOf('completed')) {
-            _e._$addClassName(node, 'completed');
-            params.itemType = ['all', 'completed'];
-            _left_item_count--;
-            _pro._remoteChangeCompleteItem(params);
-          }
-        }
-      });
-      _isClear = !_isClear;
-    });
+    _p._initAddItem();
+    _p._initEditItem();
+    _p._initToggleAll();
 
     _v._$addEvent(_selectors, 'click', function(_event) {
       var _new_selected = _v._$getElement(_event);
